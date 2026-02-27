@@ -1,0 +1,17 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.202.1:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1340ms
+ GET /upload?id=37ea99ea-2a7a-461f-b304-82b46d44d8f3&vscodeBrowserReqId=1770686427221 200 in 1384ms (compile: 1167ms, render: 217ms)
+ GET /students 200 in 56ms (compile: 39ms, render: 17ms)
+ GET /teachers 200 in 106ms (compile: 89ms, render: 17ms)
+ GET /classes 200 in 102ms (compile: 77ms, render: 26ms)
+ GET /students 200 in 17ms (compile: 4ms, render: 13ms)
+ GET /teachers 200 in 18ms (compile: 6ms, render: 13ms)
+ GET /subjects 200 in 72ms (compile: 59ms, render: 13ms)
+ GET /rooms 200 in 117ms (compile: 82ms, render: 35ms)
+ GET /timetable 200 in 91ms (compile: 70ms, render: 22ms)
+ GET /upload 200 in 36ms (compile: 18ms, render: 18ms)

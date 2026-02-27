@@ -1,0 +1,359 @@
+@import "tailwindcss";
+
+/*
+ * UniAttendance Admin Dashboard — Dark Industrial Theme
+ * Charcoal + Orange accent color scheme
+ */
+
+@theme {
+  /* ─── Orange Accent Scale ─────────────────────────────────── */
+  --color-accent-50: #fff7ed;
+  --color-accent-100: #ffedd5;
+  --color-accent-200: #fed7aa;
+  --color-accent-300: #fdba74;
+  --color-accent-400: #fb923c;
+  --color-accent-500: #f97316;
+  --color-accent-600: #ea580c;
+  --color-accent-700: #c2410c;
+  --color-accent-800: #9a3412;
+  --color-accent-900: #7c2d12;
+
+  /* ─── Dark Surface Colors ─────────────────────────────────── */
+  --color-bg-primary: #0d0d0d;
+  --color-bg-secondary: #1a1a1a;
+  --color-surface: #1a1a1a;
+  --color-surface-raised: #242424;
+  --color-surface-elevated: #2e2e2e;
+  --color-surface-hover: #333333;
+  
+  /* ─── Sidebar ─────────────────────────────────────────────── */
+  --color-sidebar: #0d0d0d;
+  --color-sidebar-hover: #1a1a1a;
+  --color-sidebar-active: #242424;
+
+  /* ─── Border Colors ───────────────────────────────────────── */
+  --color-border: #333333;
+  --color-border-hover: #444444;
+  --color-border-accent: #f97316;
+
+  /* ─── Text Colors ─────────────────────────────────────────── */
+  --color-text-primary: #f5f5f5;
+  --color-text-secondary: #a3a3a3;
+  --color-text-muted: #737373;
+  --color-text-accent: #f97316;
+
+  /* ─── Status Colors ───────────────────────────────────────── */
+  --color-success: #22c55e;
+  --color-success-muted: #166534;
+  --color-warning: #eab308;
+  --color-warning-muted: #854d0e;
+  --color-danger: #ef4444;
+  --color-danger-muted: #991b1b;
+  --color-info: #3b82f6;
+  --color-info-muted: #1e40af;
+
+  /* ─── Chart Colors ────────────────────────────────────────── */
+  --color-chart-orange: #f97316;
+  --color-chart-orange-dim: rgba(249, 115, 22, 0.3);
+  --color-chart-green: #22c55e;
+  --color-chart-yellow: #eab308;
+  --color-chart-red: #ef4444;
+  --color-chart-blue: #3b82f6;
+}
+
+/* ─── Base Styles ───────────────────────────────────────────── */
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* ─── Typography ────────────────────────────────────────────── */
+.font-display {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.font-mono-data {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Segoe UI Mono', monospace;
+}
+
+/* ─── Custom Scrollbar (Dark) ───────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-elevated);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-surface-hover);
+}
+
+/* ─── Card Styles ───────────────────────────────────────────── */
+.card {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 
+              0 2px 4px -2px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+.card-elevated {
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4),
+              0 4px 6px -4px rgba(0, 0, 0, 0.3),
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+/* ─── Accent Border Highlight ───────────────────────────────── */
+.accent-left-border {
+  border-left: 3px solid var(--color-accent-500);
+}
+
+.accent-glow {
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.15);
+}
+
+/* ─── KPI Card ──────────────────────────────────────────────── */
+.kpi-card {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+}
+
+/* ─── Status Badges ─────────────────────────────────────────── */
+.badge-present {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.badge-late {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.badge-absent {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* ─── Table Styles (Dark) ───────────────────────────────────── */
+.table-row-hover:hover {
+  background-color: var(--color-surface-hover);
+}
+
+/* ─── Grain/Noise Texture Overlay ───────────────────────────── */
+.grain-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* ─── Animations ────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(249, 115, 22, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(249, 115, 22, 0.6); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slide-in-left 0.2s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.2s ease-out;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ─── Chart Container ───────────────────────────────────────── */
+.chart-container {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+/* ─── Input/Form Dark Styles ────────────────────────────────── */
+input, select, textarea {
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--color-accent-500);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* ─── Button Styles ─────────────────────────────────────────── */
+.btn-primary {
+  background: var(--color-accent-500);
+  color: white;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-600);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-hover);
+}
+
+/* ─── Trend Indicators ──────────────────────────────────────── */
+.trend-up {
+  color: #4ade80;
+}
+
+.trend-down {
+  color: #f87171;
+}
+
+/* ─── Donut Chart Center ────────────────────────────────────── */
+.donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+/* ─── Progress Bar ──────────────────────────────────────────── */
+.progress-bar {
+  background: var(--color-surface-elevated);
+  border-radius: 4px;
+  overflow: hidden;
+  height: 6px;
+}
+
+.progress-bar-fill {
+  background: var(--color-accent-500);
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+/* ─── Activity Feed ─────────────────────────────────────────── */
+.activity-item {
+  border-left: 2px solid var(--color-border);
+  padding-left: 1rem;
+  margin-left: 0.5rem;
+  position: relative;
+}
+
+.activity-item::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent-500);
+}
+
+/* ─── Alert Cards ───────────────────────────────────────────── */
+.alert-card {
+  background: var(--color-surface-raised);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-left: 3px solid var(--color-danger);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.alert-warning {
+  border-color: rgba(234, 179, 8, 0.3);
+  border-left-color: var(--color-warning);
+}
