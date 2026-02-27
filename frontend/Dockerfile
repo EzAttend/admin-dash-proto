@@ -38,7 +38,7 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Don't run as root
-RUN adduser --system --uid 1001 nextjs
+RUN useradd --system --uid 1001 --no-create-home nextjs
 RUN mkdir -p .next && chown nextjs:nogroup .next
 
 # Copy standalone output and static assets
