@@ -29,8 +29,12 @@ import {
   timetableEntityConfig,
 } from '@/ingestion/entity-configs';
 import type { EntityConfig } from '@/ingestion/types';
+import { migrateAuthDB } from '@/utils/auth-migrate';
 
 const app = express();
+
+// Trust first proxy (Traefik/Dokploy) — required for rate limiter behind reverse proxy
+app.set('trust proxy', 1);
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -92,6 +96,9 @@ app.use((_req: Request, res: Response) => {
 app.use(errorHandler);
 
 async function bootstrap(): Promise<void> {
+  // Migrate auth SQLite tables before anything else
+  await migrateAuthDB();
+
   await connectDatabase();
 
   // Register entity configs for CSV ingestion worker
