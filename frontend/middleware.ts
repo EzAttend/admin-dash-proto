@@ -17,7 +17,10 @@ const authPaths = ["/sign-in", "/sign-up"];
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
-    const sessionCookie = request.cookies.get("ez_admin.session_token");
+    // Check both plain and __Secure- prefixed cookie (cross-subdomain sets Secure flag)
+    const sessionCookie =
+        request.cookies.get("ez_admin.session_token") ||
+        request.cookies.get("__Secure-ez_admin.session_token");
     const isAuthenticated = !!sessionCookie?.value;
 
     const isProtected = protectedPaths.some(
