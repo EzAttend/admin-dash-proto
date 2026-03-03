@@ -7,7 +7,8 @@ COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile
 
 # ── Stage 2: Build ────────────────────────────────────────────────────────────
-FROM oven/bun:1 AS builder
+# Use Node.js for building — Bun segfaults on arm64 under QEMU emulation
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -27,7 +28,7 @@ ENV NEXT_PUBLIC_BETTER_AUTH_URL=${NEXT_PUBLIC_BETTER_AUTH_URL}
 # Next.js collects telemetry — disable it during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN bun --bun next build
+RUN npx next build
 
 # ── Stage 3: Production ──────────────────────────────────────────────────────
 FROM oven/bun:1-slim AS runner
