@@ -264,7 +264,7 @@ export function CsvUpload() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Step indicators */}
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
         {[ 'Choose Type', 'Upload File', 'Results' ].map((label, i) => {
           const stepNum = (i + 1) as 1 | 2 | 3;
           const isActive = step === stepNum;
@@ -300,7 +300,7 @@ export function CsvUpload() {
             Select the type of data you want to import. Each type requires
             specific columns in your CSV file.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {ENTITY_OPTIONS.map((opt) => {
               const Icon = opt.icon;
               return (
@@ -606,7 +606,7 @@ export function CsvUpload() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatPill label="Total" value={job.total_rows} />
                 <StatPill label="Processed" value={job.processed_rows} />
                 <StatPill label="Succeeded" value={job.success_count} variant="success" />

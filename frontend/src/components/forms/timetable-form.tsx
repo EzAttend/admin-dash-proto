@@ -150,7 +150,7 @@ export function TimetableForm({ initial, fieldErrors, onSubmit, loading }: Timet
         </select>
       </FormField>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Start Time" required error={fieldErrors.start_time}>
           <input
             type="time"

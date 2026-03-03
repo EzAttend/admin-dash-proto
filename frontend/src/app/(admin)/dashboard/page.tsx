@@ -77,7 +77,7 @@ function KPICard({
             {label}
           </p>
           <div className="flex items-baseline gap-3">
-            <span className="text-3xl font-bold text-white font-display tracking-tight">
+            <span className="text-2xl sm:text-3xl font-bold text-white font-display tracking-tight">
               {value}
             </span>
             <span
@@ -198,12 +198,12 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Attendance Trends Chart - Takes 2 columns */}
         <div className="lg:col-span-2 card p-6">
-          <div className="flex items-start justify-between mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between mb-6 gap-4">
             <div>
               <h2 className="text-lg font-semibold text-white">Attendance Trends</h2>
               <p className="text-sm text-[#737373]">Academic performance and attendance metrics</p>
             </div>
-            <div className="flex items-center gap-6 text-sm">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-accent-500"></span>
                 <span className="text-[#a3a3a3]">CURRENT WEEK</span>
@@ -217,7 +217,7 @@ export default function DashboardPage() {
             </div>
           </div>
           
-          <div className="h-[300px]">
+          <div className="h-[250px] sm:h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={attendanceTrends}>
                 <defs>

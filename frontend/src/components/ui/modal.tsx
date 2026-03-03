@@ -45,7 +45,7 @@ export function Modal({ open, onClose, title, children, wide }: ModalProps) {
         } max-h-[90vh] flex flex-col mx-4 animate-fade-in`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#333]">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[#333]">
           <h3 className="text-base font-semibold text-white">{title}</h3>
           <button
             onClick={onClose}
@@ -57,7 +57,7 @@ export function Modal({ open, onClose, title, children, wide }: ModalProps) {
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 overflow-y-auto flex-1">{children}</div>
+        <div className="px-4 sm:px-6 py-5 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   );

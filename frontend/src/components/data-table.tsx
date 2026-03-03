@@ -138,7 +138,7 @@ export function DataTable<T extends { _id: string }>({
         {/* Search bar */}
         {data.length > 0 && (
           <div className="px-4 py-3 border-b border-[#333]">
-            <div className="relative max-w-sm">
+            <div className="relative w-full sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]" />
               <input
                 type="text"

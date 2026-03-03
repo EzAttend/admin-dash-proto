@@ -35,10 +35,10 @@ function SignInForm() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#0d0d0d]">
+        <div className="min-h-screen flex items-center justify-center bg-[#0d0d0d] px-4">
             <form
                 onSubmit={handleSubmit}
-                className="w-full max-w-sm bg-[#1a1a1a] border border-[#333] rounded-xl shadow-2xl p-8 space-y-6 animate-fade-in"
+                className="w-full max-w-sm bg-[#1a1a1a] border border-[#333] rounded-xl shadow-2xl p-6 sm:p-8 space-y-6 animate-fade-in"
             >
                 <div className="text-center space-y-1">
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center text-white font-bold text-lg mx-auto shadow-lg shadow-accent-500/20">

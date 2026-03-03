@@ -136,7 +136,7 @@ export function SessionForm({ initial, fieldErrors, onSubmit, loading }: Session
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium text-gray-700">Teacher Location (optional)</span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <FormField label="Latitude" error={fieldErrors['teacher_location_data.lat']}>
             <input
               type="number"

@@ -17,9 +17,11 @@ import {
   CheckSquare,
   Search,
   Bell,
+  Menu,
+  X,
 } from 'lucide-react';
 import { signOut, useSession } from '@/lib/auth-client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface NavItem {
   href: string;
@@ -82,6 +84,17 @@ export default function AdminLayout({
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const [searchQuery, setSearchQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close sidebar on route change (mobile)
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  useEffect(() => { closeSidebar(); }, [pathname, closeSidebar]);
+
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, [sidebarOpen]);
 
   // Get current page title for header
   const getCurrentPageTitle = () => {
@@ -121,19 +134,40 @@ export default function AdminLayout({
     <div className="min-h-screen flex bg-[#0d0d0d]">
       {/* Grain overlay for texture */}
       <div className="grain-overlay" />
+
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+          onClick={closeSidebar}
+        />
+      )}
       
       {/* Sidebar */}
-      <aside className="w-64 bg-[#0d0d0d] border-r border-[#1f1f1f] flex flex-col shrink-0 fixed h-screen z-40">
+      <aside
+        className={`w-64 bg-[#0d0d0d] border-r border-[#1f1f1f] flex flex-col shrink-0 fixed h-screen z-50 transition-transform duration-200 ease-in-out ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0`}
+      >
         {/* Logo area */}
         <div className="px-4 py-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent-500 flex items-center justify-center shadow-lg shadow-accent-500/20">
-              <span className="text-white font-bold text-sm">UA</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-accent-500 flex items-center justify-center shadow-lg shadow-accent-500/20">
+                <span className="text-white font-bold text-sm">UA</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-white tracking-tight">UniAttendance</span>
+                <span className="text-[10px] text-[#737373] uppercase tracking-wider">Admin Portal</span>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-white tracking-tight">UniAttendance</span>
-              <span className="text-[10px] text-[#737373] uppercase tracking-wider">Admin Portal</span>
-            </div>
+            <button
+              onClick={closeSidebar}
+              className="lg:hidden p-1.5 rounded-md text-[#737373] hover:text-white hover:bg-[#1a1a1a] transition-colors"
+              aria-label="Close sidebar"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
         
@@ -212,11 +246,18 @@ export default function AdminLayout({
       </aside>
 
       {/* Main content area */}
-      <div className="flex-1 ml-64 min-h-screen flex flex-col">
+      <div className="flex-1 lg:ml-64 min-h-screen flex flex-col">
         {/* Top Bar */}
-        <header className="h-16 bg-[#0d0d0d] border-b border-[#1f1f1f] flex items-center justify-between px-6 sticky top-0 z-30">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-semibold text-white">{getCurrentPageTitle()}</h1>
+        <header className="h-16 bg-[#0d0d0d] border-b border-[#1f1f1f] flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 text-[#737373] hover:text-white hover:bg-[#1a1a1a] rounded-lg transition-colors"
+              aria-label="Open sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h1 className="text-lg sm:text-xl font-semibold text-white">{getCurrentPageTitle()}</h1>
           </div>
           
           <div className="flex items-center gap-4">
@@ -241,7 +282,7 @@ export default function AdminLayout({
         
         {/* Page Content */}
         <main className="flex-1 overflow-auto bg-[#111111]">
-          <div className="p-6 lg:p-8">
+          <div className="p-4 sm:p-6 lg:p-8">
             {children}
           </div>
         </main>
