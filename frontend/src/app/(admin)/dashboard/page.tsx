@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useList } from '@/lib/hooks';
 import Link from 'next/link';
 import {
@@ -28,30 +29,19 @@ import type {
   TeacherEntity,
   SessionEntity,
   AttendanceEntity,
+  ClassEntity,
+  RoomEntity,
+  UserIdentity,
 } from '@/lib/types';
 
-/* ─── Mock Data for Charts ────────────────────────────────────── */
-const attendanceTrends = [
-  { month: 'JAN', current: 8200, previous: 7800 },
-  { month: 'FEB', current: 9100, previous: 8500 },
-  { month: 'MAR', current: 10500, previous: 9200 },
-  { month: 'APR', current: 11800, previous: 10100 },
-  { month: 'MAY', current: 13200, previous: 11500 },
-  { month: 'JUN', current: 14285, previous: 12940 },
-];
+/* ─── Helpers ─────────────────────────────────────────────────── */
+function getPersonName(user: string | UserIdentity): string {
+  if (typeof user === 'object' && user !== null) return user.name;
+  return String(user);
+}
 
-const departmentData = [
-  { name: 'Engineering', value: 38.6, color: '#f97316' },
-  { name: 'Computer Science', value: 24.2, color: '#374151' },
-  { name: 'Business', value: 18.5, color: '#4b5563' },
-  { name: 'Arts', value: 12.3, color: '#6b7280' },
-  { name: 'Science', value: 6.4, color: '#9ca3af' },
-];
-
-const locationData = [
-  { name: 'Main Campus (NYC)', percentage: 92 },
-  { name: 'North Wing (NJ)', percentage: 78 },
-];
+const MONTH_LABELS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const CLASS_COLORS = ['#f97316', '#374151', '#4b5563', '#6b7280', '#9ca3af'];
 
 /* ─── KPI Card Component ──────────────────────────────────────── */
 function KPICard({
@@ -111,7 +101,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
         <p className="text-[#737373] text-xs mb-1">{label}</p>
         {payload.map((p, idx) => (
           <p key={idx} className="text-white text-sm font-semibold">
-            {p.dataKey === 'current' ? 'Current' : 'Previous'}: ${p.value.toLocaleString()}
+            {p.dataKey === 'current' ? 'Present' : 'Absent'}: {p.value.toLocaleString()}
           </p>
         ))}
       </div>
@@ -124,11 +114,13 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 export default function DashboardPage() {
   const { data: students, loading: l1 } = useList<StudentEntity>('/students');
-  const { data: _teachers, loading: l2 } = useList<TeacherEntity>('/teachers');
+  const { data: teachers, loading: l2 } = useList<TeacherEntity>('/teachers');
   const { data: _sessions, loading: l3 } = useList<SessionEntity>('/sessions');
   const { data: attendance, loading: l4 } = useList<AttendanceEntity>('/attendance');
+  const { data: classes, loading: l5 } = useList<ClassEntity>('/classes');
+  const { data: rooms, loading: l6 } = useList<RoomEntity>('/rooms');
 
-  const loading = l1 || l2 || l3 || l4;
+  const loading = l1 || l2 || l3 || l4 || l5 || l6;
 
   // Calculate stats
   const totalStudents = students.length;
@@ -142,19 +134,111 @@ export default function DashboardPage() {
   const absentCount = attendance.filter(a => a.status === 'Absent').length;
   const absenteeRate = totalAttendance > 0 ? ((absentCount / totalAttendance) * 100).toFixed(1) : '0';
 
-  // Mock low attendance students
-  const lowAttendanceStudents = [
-    { name: 'Alex Kim', course: 'CS-402 Systems', rate: 64, trend: 'down' },
-    { name: 'Jordan Lee', course: 'ENG-201 Design', rate: 68, trend: 'down' },
-    { name: 'Taylor Smith', course: 'BUS-301 Finance', rate: 71, trend: 'up' },
-  ];
+  // ── Attendance trends by month (present vs absent) ────────────
+  const attendanceTrends = useMemo(() => {
+    if (attendance.length === 0) return [];
+    const monthMap: Record<string, { present: number; absent: number }> = {};
+    for (const a of attendance) {
+      const d = new Date(a.timestamp);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+      if (!monthMap[key]) monthMap[key] = { present: 0, absent: 0 };
+      if (a.status === 'Present' || a.status === 'Late') {
+        monthMap[key].present++;
+      } else {
+        monthMap[key].absent++;
+      }
+    }
+    return Object.entries(monthMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([key, val]) => {
+        const month = parseInt(key.split('-')[1]);
+        return { month: MONTH_LABELS[month], current: val.present, previous: val.absent };
+      });
+  }, [attendance]);
 
-  // Mock faculty activity
-  const facultyActivity = [
-    { name: 'Prof. Sarah Jenkins', dept: 'Computer Science • Dept Head', status: 'LOGGED', time: '2 MINS AGO' },
-    { name: 'Dr. Michael Chen', dept: 'Engineering • Professor', status: 'IN SESSION', time: '15 MINS AGO' },
-    { name: 'Prof. Emily Davis', dept: 'Business • Associate', status: 'LOGGED', time: '1 HR AGO' },
-  ];
+  const totalPresent = attendanceTrends.reduce((s: number, d) => s + d.current, 0);
+  const totalAbsent = attendanceTrends.reduce((s: number, d) => s + d.previous, 0);
+
+  // ── Class distribution (for pie chart) ────────────────────────
+  const departmentData = useMemo(() => {
+    const counts: Record<string, { name: string; count: number }> = {};
+    for (const cls of classes) {
+      counts[cls._id] = { name: cls.class_name, count: 0 };
+    }
+    for (const s of students) {
+      const classId = typeof s.class_id === 'string' ? s.class_id : s.class_id?._id;
+      if (classId && counts[classId]) counts[classId].count++;
+    }
+    return Object.values(counts)
+      .filter(c => c.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map((c, i) => ({
+        name: c.name,
+        value: totalStudents > 0 ? parseFloat(((c.count / totalStudents) * 100).toFixed(1)) : 0,
+        color: CLASS_COLORS[i % CLASS_COLORS.length],
+      }));
+  }, [classes, students, totalStudents]);
+
+  const topDept = departmentData[0];
+
+  // ── Rooms by building (for location bars) ─────────────────────
+  const locationData = useMemo(() => {
+    if (rooms.length === 0) return [];
+    const buildingCounts: Record<string, number> = {};
+    for (const r of rooms) buildingCounts[r.building_name] = (buildingCounts[r.building_name] || 0) + 1;
+    const totalRooms = rooms.length;
+    return Object.entries(buildingCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([name, count]) => ({
+        name,
+        percentage: totalRooms > 0 ? Math.round((count / totalRooms) * 100) : 0,
+      }));
+  }, [rooms]);
+
+  // ── Faculty activity (real teachers) ──────────────────────────
+  const facultyActivity = useMemo(() => {
+    return teachers.slice(0, 3).map((t) => {
+      const name = getPersonName(t.userId);
+      return {
+        name,
+        dept: `ID: ${t.teacher_id}`,
+        status: 'LOGGED' as const,
+        time: '',
+      };
+    });
+  }, [teachers]);
+
+  // ── Low attendance students (<80% threshold) ──────────────────
+  const lowAttendanceStudents = useMemo(() => {
+    if (attendance.length === 0 || students.length === 0) return [];
+    const studentStats: Record<string, { total: number; present: number }> = {};
+    for (const a of attendance) {
+      const sid = typeof a.student_id === 'string' ? a.student_id : a.student_id?._id;
+      if (!sid) continue;
+      if (!studentStats[sid]) studentStats[sid] = { total: 0, present: 0 };
+      studentStats[sid].total++;
+      if (a.status === 'Present' || a.status === 'Late') studentStats[sid].present++;
+    }
+    const studentMap = new Map(students.map(s => [s._id, s]));
+    return Object.entries(studentStats)
+      .map(([sid, stats]) => {
+        const student = studentMap.get(sid);
+        const rate = stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 100;
+        const className = student && typeof student.class_id === 'object' ? student.class_id.class_name : '';
+        return {
+          name: student ? getPersonName(student.userId) : sid,
+          course: className || '—',
+          rate,
+          trend: rate < 60 ? 'down' as const : 'up' as const,
+        };
+      })
+      .filter(s => s.rate < 80)
+      .sort((a, b) => a.rate - b.rate)
+      .slice(0, 3);
+  }, [attendance, students]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -163,32 +247,32 @@ export default function DashboardPage() {
         <KPICard
           label="Total Students"
           value={loading ? '...' : totalStudents.toLocaleString()}
-          trend="up"
-          trendValue="+11.01%"
+          trend={enrolledStudents > 0 ? 'up' : 'neutral'}
+          trendValue={`${enrolledStudents} enrolled`}
           icon={GraduationCap}
           iconBg="bg-[#1e3a5f] text-blue-400"
         />
         <KPICard
           label="Faculty Attendance"
           value={loading ? '...' : `${attendanceRate}%`}
-          trend="down"
-          trendValue="-0.03%"
+          trend={parseFloat(attendanceRate) >= 75 ? 'up' : 'down'}
+          trendValue={`${presentCount}/${totalAttendance}`}
           icon={Users}
           iconBg="bg-[#1e3a3a] text-emerald-400"
         />
         <KPICard
           label="Absentee Rate"
           value={loading ? '...' : `${absenteeRate}%`}
-          trend="up"
-          trendValue="+15.03%"
+          trend={parseFloat(absenteeRate) > 25 ? 'down' : 'up'}
+          trendValue={`${absentCount} absent`}
           icon={AlertTriangle}
           iconBg="bg-[#3a2a1e] text-amber-400"
         />
         <KPICard
           label="Enrollment Growth"
           value={loading ? '...' : `${((enrolledStudents / (totalStudents || 1)) * 100).toFixed(1)}%`}
-          trend="up"
-          trendValue="+6.08%"
+          trend={parseFloat(String((enrolledStudents / (totalStudents || 1)) * 100)) >= 50 ? 'up' : 'down'}
+          trendValue={`${_pendingEnrollments} pending`}
           icon={BarChart3}
           iconBg="bg-[#2a1e3a] text-purple-400"
         />
@@ -206,13 +290,13 @@ export default function DashboardPage() {
             <div className="flex items-center gap-6 text-sm">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-accent-500"></span>
-                <span className="text-[#a3a3a3]">CURRENT WEEK</span>
-                <span className="text-white font-semibold">$14,285</span>
+                <span className="text-[#a3a3a3]">PRESENT</span>
+                <span className="text-white font-semibold">{totalPresent.toLocaleString()}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-[#525252]"></span>
-                <span className="text-[#a3a3a3]">PREVIOUS WEEK</span>
-                <span className="text-white font-semibold">$12,940</span>
+                <span className="text-[#a3a3a3]">ABSENT</span>
+                <span className="text-white font-semibold">{totalAbsent.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -241,7 +325,6 @@ export default function DashboardPage() {
                   stroke="#525252" 
                   tick={{ fill: '#737373', fontSize: 12 }}
                   axisLine={{ stroke: '#262626' }}
-                  tickFormatter={(value) => `${value / 1000}k`}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Area
@@ -274,7 +357,7 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={departmentData}
+                    data={departmentData.length > 0 ? departmentData : [{ name: 'No data', value: 100, color: '#262626' }]}
                     cx="50%"
                     cy="50%"
                     innerRadius={55}
@@ -282,15 +365,15 @@ export default function DashboardPage() {
                     paddingAngle={2}
                     dataKey="value"
                   >
-                    {departmentData.map((entry, index) => (
+                    {(departmentData.length > 0 ? departmentData : [{ name: 'No data', value: 100, color: '#262626' }]).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
               <div className="donut-center">
-                <p className="text-2xl font-bold text-white">38.6%</p>
-                <p className="text-[10px] text-accent-500 uppercase tracking-wider">Engineering</p>
+                <p className="text-2xl font-bold text-white">{topDept?.value ?? 0}%</p>
+                <p className="text-[10px] text-accent-500 uppercase tracking-wider">{topDept?.name ?? '—'}</p>
               </div>
             </div>
             <div className="mt-4 space-y-2">
@@ -331,10 +414,10 @@ export default function DashboardPage() {
               ))}
             </div>
             <div className="mt-4 pt-4 border-t border-[#262626] flex items-center justify-between">
-              <span className="text-xs text-[#525252]">LAST SYNC: 2M AGO</span>
-              <button className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
-                LIVE VIEW
-              </button>
+              <span className="text-xs text-[#525252]">{rooms.length} TOTAL ROOMS</span>
+              <Link href="/rooms" className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
+                VIEW ALL
+              </Link>
             </div>
           </div>
         </div>
