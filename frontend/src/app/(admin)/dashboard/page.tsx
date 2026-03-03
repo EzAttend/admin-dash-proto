@@ -11,8 +11,6 @@ import {
   AlertTriangle,
   BarChart3,
   MapPin,
-  RefreshCw,
-  CheckSquare,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -35,6 +33,16 @@ import type {
   RoomEntity,
   UserIdentity,
 } from '@/lib/types';
+
+/* ─── Helpers ─────────────────────────────────────────────────── */
+
+function getPersonName(user: string | UserIdentity): string {
+  if (typeof user === 'object' && user !== null) return user.name;
+  return String(user);
+}
+
+const MONTH_LABELS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const CLASS_COLORS = ['#f97316', '#374151', '#4b5563', '#6b7280', '#9ca3af'];
 
 /* ─── KPI Card Component ──────────────────────────────────────── */
 function KPICard({
@@ -63,21 +71,19 @@ function KPICard({
             <span className="text-2xl sm:text-3xl font-bold text-white font-display tracking-tight">
               {value}
             </span>
-            {trendValue && (
-              <span
-                className={`flex items-center gap-1 text-xs font-semibold ${
-                  trend === 'up'
-                    ? 'text-emerald-400'
-                    : trend === 'down'
-                    ? 'text-red-400'
-                    : 'text-[#737373]'
-                }`}
-              >
-                {trend === 'up' && <TrendingUp className="w-3 h-3" />}
-                {trend === 'down' && <TrendingDown className="w-3 h-3" />}
-                {trendValue}
-              </span>
-            )}
+            <span
+              className={`flex items-center gap-1 text-xs font-semibold ${
+                trend === 'up'
+                  ? 'text-emerald-400'
+                  : trend === 'down'
+                  ? 'text-red-400'
+                  : 'text-[#737373]'
+              }`}
+            >
+              {trend === 'up' && <TrendingUp className="w-3 h-3" />}
+              {trend === 'down' && <TrendingDown className="w-3 h-3" />}
+              {trendValue}
+            </span>
           </div>
         </div>
         <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconBg}`}>
@@ -96,7 +102,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
         <p className="text-[#737373] text-xs mb-1">{label}</p>
         {payload.map((p, idx) => (
           <p key={idx} className="text-white text-sm font-semibold">
-            {p.dataKey === 'present' ? 'Present' : p.dataKey === 'absent' ? 'Absent' : p.dataKey}: {p.value.toLocaleString()}
+            {p.dataKey === 'present' ? 'Present' : 'Absent'}: {p.value.toLocaleString()}
           </p>
         ))}
       </div>
@@ -104,18 +110,6 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   }
   return null;
 }
-
-/* ─── Helpers ─────────────────────────────────────────────────── */
-
-function getPersonName(user: string | UserIdentity): string {
-  if (typeof user === 'object' && user !== null) {
-    return user.name;
-  }
-  return String(user);
-}
-
-const MONTH_LABELS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-const CLASS_COLORS = ['#f97316', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#ef4444', '#06b6d4', '#ec4899', '#374151', '#4b5563'];
 
 /* ─── Dashboard Page ──────────────────────────────────────────── */
 
@@ -129,10 +123,10 @@ export default function DashboardPage() {
 
   const loading = l1 || l2 || l3 || l4 || l5 || l6;
 
-  // ── Calculate stats ───────────────────────────────────────────
+  // Calculate stats
   const totalStudents = students.length;
   const enrolledStudents = students.filter(s => s.enrollment_status === 'Enrolled').length;
-  const pendingStudents = students.filter(s => s.enrollment_status === 'Pending').length;
+  const _pendingEnrollments = students.filter(s => s.enrollment_status === 'Pending').length;
 
   const presentCount = attendance.filter(a => a.status === 'Present').length;
   const totalAttendance = attendance.length;
@@ -164,49 +158,41 @@ export default function DashboardPage() {
       .slice(-6)
       .map(([key, val]) => {
         const month = parseInt(key.split('-')[1]);
-        return {
-          month: MONTH_LABELS[month],
-          present: val.present,
-          absent: val.absent,
-        };
+        return { month: MONTH_LABELS[month], present: val.present, absent: val.absent };
       });
   }, [attendance]);
 
-  const totalPresent = attendanceTrends.reduce((sum, d) => sum + d.present, 0);
-  const totalAbsent = attendanceTrends.reduce((sum, d) => sum + d.absent, 0);
+  const totalPresent = attendanceTrends.reduce((s: number, d) => s + d.present, 0);
+  const totalAbsent = attendanceTrends.reduce((s: number, d) => s + d.absent, 0);
 
-  // ── Students per class (for pie chart) ────────────────────────
-  const classDistribution = useMemo(() => {
+  // ── Class distribution (for pie chart) ────────────────────────
+  const departmentData = useMemo(() => {
     const counts: Record<string, { name: string; count: number }> = {};
     for (const cls of classes) {
       counts[cls._id] = { name: cls.class_name, count: 0 };
     }
     for (const s of students) {
       const classId = typeof s.class_id === 'string' ? s.class_id : s.class_id?._id;
-      if (classId && counts[classId]) {
-        counts[classId].count++;
-      }
+      if (classId && counts[classId]) counts[classId].count++;
     }
     return Object.values(counts)
       .filter(c => c.count > 0)
       .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
       .map((c, i) => ({
         name: c.name,
         value: totalStudents > 0 ? parseFloat(((c.count / totalStudents) * 100).toFixed(1)) : 0,
-        count: c.count,
         color: CLASS_COLORS[i % CLASS_COLORS.length],
       }));
   }, [classes, students, totalStudents]);
 
-  const topClass = classDistribution[0];
+  const topDept = departmentData[0];
 
   // ── Rooms by building (for location bars) ─────────────────────
-  const roomsByBuilding = useMemo(() => {
+  const locationData = useMemo(() => {
     if (rooms.length === 0) return [];
     const buildingCounts: Record<string, number> = {};
-    for (const r of rooms) {
-      buildingCounts[r.building_name] = (buildingCounts[r.building_name] || 0) + 1;
-    }
+    for (const r of rooms) buildingCounts[r.building_name] = (buildingCounts[r.building_name] || 0) + 1;
     const totalRooms = rooms.length;
     return Object.entries(buildingCounts)
       .sort(([, a], [, b]) => b - a)
@@ -214,17 +200,19 @@ export default function DashboardPage() {
       .map(([name, count]) => ({
         name,
         percentage: totalRooms > 0 ? Math.round((count / totalRooms) * 100) : 0,
-        count,
       }));
   }, [rooms]);
 
-  // ── Faculty list (real data) ──────────────────────────────────
-  const facultyList = useMemo(() => {
-    return teachers.slice(0, 5).map((t) => ({
-      name: getPersonName(t.userId),
-      id: t.teacher_id,
-      initials: getPersonName(t.userId).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
-    }));
+  // ── Faculty activity (real data) ──────────────────────────────
+  const facultyActivity = useMemo(() => {
+    return teachers.slice(0, 3).map((t) => {
+      const name = getPersonName(t.userId);
+      return {
+        name,
+        dept: `ID: ${t.teacher_id}`,
+        initials: name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+      };
+    });
   }, [teachers]);
 
   // ── Low attendance students (real data) ───────────────────────
@@ -237,9 +225,7 @@ export default function DashboardPage() {
       if (!sid) continue;
       if (!studentStats[sid]) studentStats[sid] = { total: 0, present: 0 };
       studentStats[sid].total++;
-      if (a.status === 'Present' || a.status === 'Late') {
-        studentStats[sid].present++;
-      }
+      if (a.status === 'Present' || a.status === 'Late') studentStats[sid].present++;
     }
 
     const studentMap = new Map(students.map(s => [s._id, s]));
@@ -247,27 +233,20 @@ export default function DashboardPage() {
       .map(([sid, stats]) => {
         const student = studentMap.get(sid);
         const rate = stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 100;
+        const className = student && typeof student.class_id === 'object'
+          ? student.class_id.class_name
+          : '';
         return {
           name: student ? getPersonName(student.userId) : sid,
-          regNo: student?.registration_number ?? '',
+          course: className,
           rate,
-          total: stats.total,
+          trend: rate < 60 ? 'down' as const : 'up' as const,
         };
       })
       .filter(s => s.rate < 80)
       .sort((a, b) => a.rate - b.rate)
-      .slice(0, 5);
+      .slice(0, 3);
   }, [attendance, students]);
-
-  /* ── Loading state ──────────────────────────────────────────── */
-  if (loading) {
-    return (
-      <div className="animate-fade-in flex flex-col items-center justify-center py-20 gap-4">
-        <RefreshCw className="w-6 h-6 animate-spin text-accent-500" />
-        <p className="text-sm text-[#737373]">Loading dashboard data...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -275,33 +254,33 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           label="Total Students"
-          value={totalStudents.toLocaleString()}
+          value={loading ? '...' : totalStudents.toLocaleString()}
           trend={enrolledStudents > 0 ? 'up' : 'neutral'}
-          trendValue={enrolledStudents > 0 ? `${enrolledStudents} enrolled` : ''}
+          trendValue={loading ? '' : `${enrolledStudents} enrolled`}
           icon={GraduationCap}
           iconBg="bg-[#1e3a5f] text-blue-400"
         />
         <KPICard
-          label="Attendance Rate"
-          value={`${attendanceRate}%`}
+          label="Faculty Attendance"
+          value={loading ? '...' : `${attendanceRate}%`}
           trend={parseFloat(attendanceRate) >= 75 ? 'up' : parseFloat(attendanceRate) > 0 ? 'down' : 'neutral'}
-          trendValue={totalAttendance > 0 ? `${presentCount}/${totalAttendance}` : ''}
+          trendValue={loading ? '' : `${presentCount}/${totalAttendance}`}
           icon={Users}
           iconBg="bg-[#1e3a3a] text-emerald-400"
         />
         <KPICard
           label="Absentee Rate"
-          value={`${absenteeRate}%`}
+          value={loading ? '...' : `${absenteeRate}%`}
           trend={parseFloat(absenteeRate) > 25 ? 'down' : parseFloat(absenteeRate) > 0 ? 'up' : 'neutral'}
-          trendValue={absentCount > 0 ? `${absentCount} absent` : ''}
+          trendValue={loading ? '' : `${absentCount} absent`}
           icon={AlertTriangle}
           iconBg="bg-[#3a2a1e] text-amber-400"
         />
         <KPICard
-          label="Enrollment Rate"
-          value={`${enrollmentRate}%`}
+          label="Enrollment Growth"
+          value={loading ? '...' : `${enrollmentRate}%`}
           trend={parseFloat(enrollmentRate) >= 50 ? 'up' : parseFloat(enrollmentRate) > 0 ? 'down' : 'neutral'}
-          trendValue={pendingStudents > 0 ? `${pendingStudents} pending` : ''}
+          trendValue={loading ? '' : `${_pendingEnrollments} pending`}
           icon={BarChart3}
           iconBg="bg-[#2a1e3a] text-purple-400"
         />
@@ -314,7 +293,7 @@ export default function DashboardPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between mb-6 gap-4">
             <div>
               <h2 className="text-lg font-semibold text-white">Attendance Trends</h2>
-              <p className="text-sm text-[#737373]">Monthly present vs absent attendance records</p>
+              <p className="text-sm text-[#737373]">Academic performance and attendance metrics</p>
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
               <div className="flex items-center gap-2">
@@ -329,218 +308,194 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-
-          {attendanceTrends.length === 0 ? (
-            <div className="flex flex-col items-center py-16 text-[#737373]">
-              <CheckSquare className="w-8 h-8 mb-2 text-[#525252]" />
-              <p className="text-sm">No attendance data yet. Records will appear here once sessions are tracked.</p>
-            </div>
-          ) : (
-            <div className="h-[250px] sm:h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={attendanceTrends}>
-                  <defs>
-                    <linearGradient id="colorPresent" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorAbsent" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#525252" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#525252" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    stroke="#525252"
-                    tick={{ fill: '#737373', fontSize: 12 }}
-                    axisLine={{ stroke: '#262626' }}
-                  />
-                  <YAxis
-                    stroke="#525252"
-                    tick={{ fill: '#737373', fontSize: 12 }}
-                    axisLine={{ stroke: '#262626' }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area
-                    type="monotone"
-                    dataKey="absent"
-                    stroke="#525252"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorAbsent)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="present"
-                    stroke="#f97316"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorPresent)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          
+          <div className="h-[250px] sm:h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={attendanceTrends}>
+                <defs>
+                  <linearGradient id="colorCurrent" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorPrevious" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#525252" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#525252" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
+                <XAxis 
+                  dataKey="month" 
+                  stroke="#525252" 
+                  tick={{ fill: '#737373', fontSize: 12 }}
+                  axisLine={{ stroke: '#262626' }}
+                />
+                <YAxis 
+                  stroke="#525252" 
+                  tick={{ fill: '#737373', fontSize: 12 }}
+                  axisLine={{ stroke: '#262626' }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Area
+                  type="monotone"
+                  dataKey="absent"
+                  stroke="#525252"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorPrevious)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="present"
+                  stroke="#f97316"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorCurrent)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Right Column */}
         <div className="space-y-6">
-          {/* Class Distribution */}
+          {/* Department Distribution */}
           <div className="card p-6">
-            <h3 className="text-base font-semibold text-white mb-4">Class Distribution</h3>
-            {classDistribution.length === 0 ? (
-              <div className="flex flex-col items-center py-8 text-[#737373]">
-                <GraduationCap className="w-8 h-8 mb-2 text-[#525252]" />
-                <p className="text-sm">No students in any class yet.</p>
+            <h3 className="text-base font-semibold text-white mb-4">Department Distribution</h3>
+            <div className="relative h-[180px] flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={departmentData.length > 0 ? departmentData : [{ name: 'No data', value: 100, color: '#262626' }]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={75}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {(departmentData.length > 0 ? departmentData : [{ name: 'No data', value: 100, color: '#262626' }]).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="donut-center">
+                <p className="text-2xl font-bold text-white">{topDept?.value ?? 0}%</p>
+                <p className="text-[10px] text-accent-500 uppercase tracking-wider">{topDept?.name ?? '—'}</p>
               </div>
-            ) : (
-              <>
-                <div className="relative h-[180px] flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={classDistribution}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={75}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {classDistribution.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="donut-center">
-                    <p className="text-2xl font-bold text-white">{topClass?.value ?? 0}%</p>
-                    <p className="text-[10px] text-accent-500 uppercase tracking-wider">{topClass?.name ?? '—'}</p>
+            </div>
+            <div className="mt-4 space-y-2">
+              {departmentData.slice(0, 2).map((dept) => (
+                <div key={dept.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: dept.color }}></span>
+                    <span className="text-sm text-[#a3a3a3]">{dept.name}</span>
                   </div>
+                  <span className="text-sm font-medium text-white">{dept.value}%</span>
                 </div>
-                <div className="mt-4 space-y-2">
-                  {classDistribution.slice(0, 3).map((cls) => (
-                    <div key={cls.name} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cls.color }}></span>
-                        <span className="text-sm text-[#a3a3a3]">{cls.name}</span>
-                      </div>
-                      <span className="text-sm font-medium text-white">{cls.value}%</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+              ))}
+            </div>
           </div>
 
-          {/* Rooms by Building */}
+          {/* Attendance by Location */}
           <div className="card p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-white">Rooms by Building</h3>
+              <h3 className="text-base font-semibold text-white">Attendance by Location</h3>
             </div>
-            {roomsByBuilding.length === 0 ? (
-              <div className="flex flex-col items-center py-8 text-[#737373]">
-                <MapPin className="w-8 h-8 mb-2 text-[#525252]" />
-                <p className="text-sm">No rooms created yet.</p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-4">
-                  {roomsByBuilding.map((loc) => (
-                    <div key={loc.name} className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-accent-500" />
-                        <span className="text-sm text-[#a3a3a3]">{loc.name}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-2 bg-[#262626] rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-accent-500 rounded-full transition-all duration-500"
-                            style={{ width: `${loc.percentage}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium text-accent-500">{loc.count} rooms</span>
-                      </div>
+            <div className="space-y-4">
+              {locationData.length === 0 ? (
+                <p className="text-sm text-[#525252]">No rooms data available.</p>
+              ) : (
+                locationData.map((loc) => (
+                  <div key={loc.name} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-accent-500" />
+                      <span className="text-sm text-[#a3a3a3]">{loc.name}</span>
                     </div>
-                  ))}
-                </div>
-                <div className="mt-4 pt-4 border-t border-[#262626] flex items-center justify-between">
-                  <span className="text-xs text-[#525252]">{rooms.length} TOTAL ROOMS</span>
-                  <Link href="/rooms" className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
-                    VIEW ALL
-                  </Link>
-                </div>
-              </>
-            )}
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-2 bg-[#262626] rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-accent-500 rounded-full transition-all duration-500"
+                          style={{ width: `${loc.percentage}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium text-accent-500">{loc.percentage}%</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="mt-4 pt-4 border-t border-[#262626] flex items-center justify-between">
+              <span className="text-xs text-[#525252]">{rooms.length} TOTAL ROOMS</span>
+              <Link href="/rooms" className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
+                VIEW ALL
+              </Link>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Bottom Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Faculty List */}
+        {/* Faculty Activity */}
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-white">Faculty</h3>
+            <h3 className="text-base font-semibold text-white">Faculty Activity</h3>
             <Link href="/teachers" className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
               VIEW ALL
             </Link>
           </div>
-          {facultyList.length === 0 ? (
-            <div className="flex flex-col items-center py-8 text-[#737373]">
-              <Users className="w-8 h-8 mb-2 text-[#525252]" />
-              <p className="text-sm">No faculty members yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {facultyList.map((faculty, idx) => (
+          <div className="space-y-4">
+            {facultyActivity.length === 0 ? (
+              <p className="text-sm text-[#525252]">No faculty data available.</p>
+            ) : (
+              facultyActivity.map((faculty, idx) => (
                 <div key={idx} className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-[#262626] flex items-center justify-center text-[#737373] font-medium text-sm">
                     {faculty.initials}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{faculty.name}</p>
-                    <p className="text-xs text-[#525252]">ID: {faculty.id}</p>
+                    <p className="text-xs text-[#525252]">{faculty.dept}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-semibold px-2 py-1 rounded bg-emerald-500/10 text-emerald-400">
+                      ACTIVE
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </div>
 
         {/* Critical Low Attendance */}
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-semibold text-white">Critical Low Attendance</h3>
-            {lowAttendanceStudents.length > 0 && (
-              <span className="text-xs font-semibold px-2 py-1 rounded bg-red-500/10 text-red-400">
-                {lowAttendanceStudents.length} ALERT{lowAttendanceStudents.length !== 1 ? 'S' : ''}
-              </span>
-            )}
+            <span className="text-xs font-semibold px-2 py-1 rounded bg-red-500/10 text-red-400">
+              {lowAttendanceStudents.length > 0 ? `${lowAttendanceStudents.length} ALERTS` : 'NO ALERTS'}
+            </span>
           </div>
-          {lowAttendanceStudents.length === 0 ? (
-            <div className="flex flex-col items-center py-8 text-[#737373]">
-              <CheckSquare className="w-8 h-8 mb-2 text-[#525252]" />
-              <p className="text-sm">
-                {totalAttendance === 0
-                  ? 'No attendance data yet.'
-                  : 'All students above 80% attendance. Great!'}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-xs text-[#525252] uppercase tracking-wider">
-                    <th className="pb-3 font-medium">Student</th>
-                    <th className="pb-3 font-medium">Reg No.</th>
-                    <th className="pb-3 font-medium">Rate</th>
-                    <th className="pb-3 font-medium">Records</th>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-xs text-[#525252] uppercase tracking-wider">
+                  <th className="pb-3 font-medium">Student</th>
+                  <th className="pb-3 font-medium">Course</th>
+                  <th className="pb-3 font-medium">Rate</th>
+                  <th className="pb-3 font-medium">Trend</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1f1f1f]">
+                {lowAttendanceStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-6 text-center text-sm text-[#525252]">
+                      {totalAttendance === 0 ? 'No attendance data yet.' : 'All students above 80% — no alerts.'}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1f1f1f]">
-                  {lowAttendanceStudents.map((student, idx) => (
+                ) : (
+                  lowAttendanceStudents.map((student, idx) => (
                     <tr key={idx} className="hover:bg-[#1a1a1a] transition-colors">
                       <td className="py-3">
                         <div className="flex items-center gap-3">
@@ -550,19 +505,23 @@ export default function DashboardPage() {
                           <span className="text-sm text-white">{student.name}</span>
                         </div>
                       </td>
-                      <td className="py-3 text-sm text-[#737373]">{student.regNo || '—'}</td>
+                      <td className="py-3 text-sm text-[#737373]">{student.course || '—'}</td>
                       <td className="py-3">
-                        <span className={`text-sm font-semibold ${
-                          student.rate < 50 ? 'text-red-400' : 'text-amber-400'
-                        }`}>{student.rate}%</span>
+                        <span className="text-sm font-semibold text-red-400">{student.rate}%</span>
                       </td>
-                      <td className="py-3 text-sm text-[#737373]">{student.total}</td>
+                      <td className="py-3">
+                        {student.trend === 'down' ? (
+                          <TrendingDown className="w-4 h-4 text-red-400" />
+                        ) : (
+                          <TrendingUp className="w-4 h-4 text-emerald-400" />
+                        )}
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
