@@ -68,7 +68,7 @@ function KPICard({
             {label}
           </p>
           <div className="flex items-baseline gap-3">
-            <span className="text-2xl sm:text-3xl font-bold text-white font-display tracking-tight">
+            <span className="text-3xl font-bold text-white font-display tracking-tight">
               {value}
             </span>
             <span
@@ -102,7 +102,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
         <p className="text-[#737373] text-xs mb-1">{label}</p>
         {payload.map((p, idx) => (
           <p key={idx} className="text-white text-sm font-semibold">
-            {p.dataKey === 'present' ? 'Present' : 'Absent'}: {p.value.toLocaleString()}
+            {p.dataKey === 'current' ? 'Current' : 'Previous'}: {p.value.toLocaleString()}
           </p>
         ))}
       </div>
@@ -127,19 +127,15 @@ export default function DashboardPage() {
   const totalStudents = students.length;
   const enrolledStudents = students.filter(s => s.enrollment_status === 'Enrolled').length;
   const _pendingEnrollments = students.filter(s => s.enrollment_status === 'Pending').length;
-
+  
   const presentCount = attendance.filter(a => a.status === 'Present').length;
   const totalAttendance = attendance.length;
   const attendanceRate = totalAttendance > 0 ? ((presentCount / totalAttendance) * 100).toFixed(1) : '0';
-
+  
   const absentCount = attendance.filter(a => a.status === 'Absent').length;
   const absenteeRate = totalAttendance > 0 ? ((absentCount / totalAttendance) * 100).toFixed(1) : '0';
 
-  const enrollmentRate = totalStudents > 0
-    ? ((enrolledStudents / totalStudents) * 100).toFixed(1)
-    : '0';
-
-  // ── Attendance trends by month (real data) ────────────────────
+  // ── Attendance trends by month (real data — mapped to current/previous) ───
   const attendanceTrends = useMemo(() => {
     if (attendance.length === 0) return [];
     const monthMap: Record<string, { present: number; absent: number }> = {};
@@ -158,14 +154,14 @@ export default function DashboardPage() {
       .slice(-6)
       .map(([key, val]) => {
         const month = parseInt(key.split('-')[1]);
-        return { month: MONTH_LABELS[month], present: val.present, absent: val.absent };
+        return { month: MONTH_LABELS[month], current: val.present, previous: val.absent };
       });
   }, [attendance]);
 
-  const totalPresent = attendanceTrends.reduce((s: number, d) => s + d.present, 0);
-  const totalAbsent = attendanceTrends.reduce((s: number, d) => s + d.absent, 0);
+  const totalCurrent = attendanceTrends.reduce((s: number, d) => s + d.current, 0);
+  const totalPrevious = attendanceTrends.reduce((s: number, d) => s + d.previous, 0);
 
-  // ── Class distribution (for pie chart) ────────────────────────
+  // ── Class / department distribution (for pie chart) ───────────
   const departmentData = useMemo(() => {
     const counts: Record<string, { name: string; count: number }> = {};
     for (const cls of classes) {
@@ -210,12 +206,13 @@ export default function DashboardPage() {
       return {
         name,
         dept: `ID: ${t.teacher_id}`,
-        initials: name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+        status: 'LOGGED' as const,
+        time: '',
       };
     });
   }, [teachers]);
 
-  // ── Low attendance students (real data) ───────────────────────
+  // ── Low attendance students (real data, <80% threshold) ───────
   const lowAttendanceStudents = useMemo(() => {
     if (attendance.length === 0 || students.length === 0) return [];
 
@@ -238,7 +235,7 @@ export default function DashboardPage() {
           : '';
         return {
           name: student ? getPersonName(student.userId) : sid,
-          course: className,
+          course: className || '—',
           rate,
           trend: rate < 60 ? 'down' as const : 'up' as const,
         };
@@ -255,32 +252,32 @@ export default function DashboardPage() {
         <KPICard
           label="Total Students"
           value={loading ? '...' : totalStudents.toLocaleString()}
-          trend={enrolledStudents > 0 ? 'up' : 'neutral'}
-          trendValue={loading ? '' : `${enrolledStudents} enrolled`}
+          trend="up"
+          trendValue={`${enrolledStudents} enrolled`}
           icon={GraduationCap}
           iconBg="bg-[#1e3a5f] text-blue-400"
         />
         <KPICard
           label="Faculty Attendance"
           value={loading ? '...' : `${attendanceRate}%`}
-          trend={parseFloat(attendanceRate) >= 75 ? 'up' : parseFloat(attendanceRate) > 0 ? 'down' : 'neutral'}
-          trendValue={loading ? '' : `${presentCount}/${totalAttendance}`}
+          trend={parseFloat(attendanceRate) >= 75 ? 'up' : 'down'}
+          trendValue={`${presentCount}/${totalAttendance}`}
           icon={Users}
           iconBg="bg-[#1e3a3a] text-emerald-400"
         />
         <KPICard
           label="Absentee Rate"
           value={loading ? '...' : `${absenteeRate}%`}
-          trend={parseFloat(absenteeRate) > 25 ? 'down' : parseFloat(absenteeRate) > 0 ? 'up' : 'neutral'}
-          trendValue={loading ? '' : `${absentCount} absent`}
+          trend={parseFloat(absenteeRate) > 25 ? 'down' : 'up'}
+          trendValue={`${absentCount} absent`}
           icon={AlertTriangle}
           iconBg="bg-[#3a2a1e] text-amber-400"
         />
         <KPICard
           label="Enrollment Growth"
-          value={loading ? '...' : `${enrollmentRate}%`}
-          trend={parseFloat(enrollmentRate) >= 50 ? 'up' : parseFloat(enrollmentRate) > 0 ? 'down' : 'neutral'}
-          trendValue={loading ? '' : `${_pendingEnrollments} pending`}
+          value={loading ? '...' : `${((enrolledStudents / (totalStudents || 1)) * 100).toFixed(1)}%`}
+          trend="up"
+          trendValue={`${_pendingEnrollments} pending`}
           icon={BarChart3}
           iconBg="bg-[#2a1e3a] text-purple-400"
         />
@@ -290,26 +287,26 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Attendance Trends Chart - Takes 2 columns */}
         <div className="lg:col-span-2 card p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between mb-6 gap-4">
+          <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-lg font-semibold text-white">Attendance Trends</h2>
               <p className="text-sm text-[#737373]">Academic performance and attendance metrics</p>
             </div>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+            <div className="flex items-center gap-6 text-sm">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-accent-500"></span>
                 <span className="text-[#a3a3a3]">PRESENT</span>
-                <span className="text-white font-semibold">{totalPresent.toLocaleString()}</span>
+                <span className="text-white font-semibold">{totalCurrent.toLocaleString()}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-[#525252]"></span>
                 <span className="text-[#a3a3a3]">ABSENT</span>
-                <span className="text-white font-semibold">{totalAbsent.toLocaleString()}</span>
+                <span className="text-white font-semibold">{totalPrevious.toLocaleString()}</span>
               </div>
             </div>
           </div>
           
-          <div className="h-[250px] sm:h-[300px]">
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={attendanceTrends}>
                 <defs>
@@ -337,7 +334,7 @@ export default function DashboardPage() {
                 <Tooltip content={<CustomTooltip />} />
                 <Area
                   type="monotone"
-                  dataKey="absent"
+                  dataKey="previous"
                   stroke="#525252"
                   strokeWidth={2}
                   fillOpacity={1}
@@ -345,7 +342,7 @@ export default function DashboardPage() {
                 />
                 <Area
                   type="monotone"
-                  dataKey="present"
+                  dataKey="current"
                   stroke="#f97316"
                   strokeWidth={2}
                   fillOpacity={1}
@@ -404,7 +401,7 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-4">
               {locationData.length === 0 ? (
-                <p className="text-sm text-[#525252]">No rooms data available.</p>
+                <p className="text-sm text-[#525252]">No room data available.</p>
               ) : (
                 locationData.map((loc) => (
                   <div key={loc.name} className="space-y-2">
@@ -452,16 +449,21 @@ export default function DashboardPage() {
               facultyActivity.map((faculty, idx) => (
                 <div key={idx} className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-[#262626] flex items-center justify-center text-[#737373] font-medium text-sm">
-                    {faculty.initials}
+                    {faculty.name.split(' ').map(n => n[0]).join('')}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{faculty.name}</p>
                     <p className="text-xs text-[#525252]">{faculty.dept}</p>
                   </div>
                   <div className="text-right">
-                    <span className="text-xs font-semibold px-2 py-1 rounded bg-emerald-500/10 text-emerald-400">
-                      ACTIVE
+                    <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                      faculty.status === 'LOGGED' 
+                        ? 'bg-emerald-500/10 text-emerald-400' 
+                        : 'bg-accent-500/10 text-accent-400'
+                    }`}>
+                      {faculty.status}
                     </span>
+                    <p className="text-[10px] text-[#525252] mt-1">{faculty.time}</p>
                   </div>
                 </div>
               ))
@@ -491,7 +493,7 @@ export default function DashboardPage() {
                 {lowAttendanceStudents.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-6 text-center text-sm text-[#525252]">
-                      {totalAttendance === 0 ? 'No attendance data yet.' : 'All students above 80% — no alerts.'}
+                      {totalAttendance === 0 ? 'No attendance data yet.' : 'All students above 80% — looking good!'}
                     </td>
                   </tr>
                 ) : (
@@ -500,12 +502,12 @@ export default function DashboardPage() {
                       <td className="py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-[#262626] flex items-center justify-center text-[#737373] text-xs font-medium">
-                            {student.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            {student.name.split(' ').map(n => n[0]).join('')}
                           </div>
                           <span className="text-sm text-white">{student.name}</span>
                         </div>
                       </td>
-                      <td className="py-3 text-sm text-[#737373]">{student.course || '—'}</td>
+                      <td className="py-3 text-sm text-[#737373]">{student.course}</td>
                       <td className="py-3">
                         <span className="text-sm font-semibold text-red-400">{student.rate}%</span>
                       </td>
