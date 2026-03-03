@@ -135,8 +135,10 @@ export default function DashboardPage() {
   const absenteeRate = totalAttendance > 0 ? ((absentCount / totalAttendance) * 100).toFixed(1) : '0';
 
   // ── Attendance trends by month (present vs absent) ────────────
+  // Always render the last 6 months so the chart has a full X-axis like the original
   const attendanceTrends = useMemo(() => {
-    if (attendance.length === 0) return [];
+    const now = new Date();
+    // Build lookup of attendance per month
     const monthMap: Record<string, { present: number; absent: number }> = {};
     for (const a of attendance) {
       const d = new Date(a.timestamp);
@@ -148,13 +150,15 @@ export default function DashboardPage() {
         monthMap[key].absent++;
       }
     }
-    return Object.entries(monthMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-6)
-      .map(([key, val]) => {
-        const month = parseInt(key.split('-')[1]);
-        return { month: MONTH_LABELS[month], current: val.present, previous: val.absent };
-      });
+    // Generate last 6 months (current month + 5 previous)
+    const result = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+      const vals = monthMap[key] || { present: 0, absent: 0 };
+      result.push({ month: MONTH_LABELS[d.getMonth()], current: vals.present, previous: vals.absent });
+    }
+    return result;
   }, [attendance]);
 
   const totalPresent = attendanceTrends.reduce((s: number, d) => s + d.current, 0);
