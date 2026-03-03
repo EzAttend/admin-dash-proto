@@ -1,19 +1,22 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useList } from '@/lib/hooks';
 import Link from 'next/link';
 import {
-  TrendingUp,
-  TrendingDown,
   Users,
   GraduationCap,
-  AlertTriangle,
-  BarChart3,
-  MapPin,
+  BookOpen,
+  DoorOpen,
+  Calendar,
+  Clock,
+  CheckSquare,
+  RefreshCw,
+  Layers,
 } from 'lucide-react';
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -28,72 +31,41 @@ import type {
   TeacherEntity,
   SessionEntity,
   AttendanceEntity,
+  ClassEntity,
+  SubjectEntity,
+  RoomEntity,
+  TimetableEntity,
 } from '@/lib/types';
-
-/* ─── Mock Data for Charts ────────────────────────────────────── */
-const attendanceTrends = [
-  { month: 'JAN', current: 8200, previous: 7800 },
-  { month: 'FEB', current: 9100, previous: 8500 },
-  { month: 'MAR', current: 10500, previous: 9200 },
-  { month: 'APR', current: 11800, previous: 10100 },
-  { month: 'MAY', current: 13200, previous: 11500 },
-  { month: 'JUN', current: 14285, previous: 12940 },
-];
-
-const departmentData = [
-  { name: 'Engineering', value: 38.6, color: '#f97316' },
-  { name: 'Computer Science', value: 24.2, color: '#374151' },
-  { name: 'Business', value: 18.5, color: '#4b5563' },
-  { name: 'Arts', value: 12.3, color: '#6b7280' },
-  { name: 'Science', value: 6.4, color: '#9ca3af' },
-];
-
-const locationData = [
-  { name: 'Main Campus (NYC)', percentage: 92 },
-  { name: 'North Wing (NJ)', percentage: 78 },
-];
 
 /* ─── KPI Card Component ──────────────────────────────────────── */
 function KPICard({
   label,
   value,
-  trend,
-  trendValue,
   icon: Icon,
   iconBg,
+  subtitle,
+  href,
 }: {
   label: string;
   value: string | number;
-  trend: 'up' | 'down' | 'neutral';
-  trendValue: string;
   icon: React.ElementType;
   iconBg: string;
+  subtitle?: string;
+  href?: string;
 }) {
-  return (
+  const card = (
     <div className="kpi-card group hover:border-accent-500/30 transition-all duration-300">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-[#737373] mb-1">
             {label}
           </p>
-          <div className="flex items-baseline gap-3">
-            <span className="text-2xl sm:text-3xl font-bold text-white font-display tracking-tight">
-              {value}
-            </span>
-            <span
-              className={`flex items-center gap-1 text-xs font-semibold ${
-                trend === 'up'
-                  ? 'text-emerald-400'
-                  : trend === 'down'
-                  ? 'text-red-400'
-                  : 'text-[#737373]'
-              }`}
-            >
-              {trend === 'up' && <TrendingUp className="w-3 h-3" />}
-              {trend === 'down' && <TrendingDown className="w-3 h-3" />}
-              {trendValue}
-            </span>
-          </div>
+          <span className="text-2xl sm:text-3xl font-bold text-white font-display tracking-tight">
+            {value}
+          </span>
+          {subtitle && (
+            <p className="text-xs text-[#737373] mt-1">{subtitle}</p>
+          )}
         </div>
         <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconBg}`}>
           <Icon className="w-6 h-6" />
@@ -101,17 +73,22 @@ function KPICard({
       </div>
     </div>
   );
+
+  if (href) {
+    return <Link href={href}>{card}</Link>;
+  }
+  return card;
 }
 
 /* ─── Custom Tooltip ──────────────────────────────────────────── */
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string }>; label?: string }) {
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string; fill: string }>; label?: string }) {
   if (active && payload && payload.length) {
     return (
       <div className="bg-[#1a1a1a] border border-[#333] rounded-lg p-3 shadow-xl">
         <p className="text-[#737373] text-xs mb-1">{label}</p>
         {payload.map((p, idx) => (
-          <p key={idx} className="text-white text-sm font-semibold">
-            {p.dataKey === 'current' ? 'Current' : 'Previous'}: ${p.value.toLocaleString()}
+          <p key={idx} className="text-white text-sm font-semibold capitalize">
+            {p.dataKey}: {p.value}
           </p>
         ))}
       </div>
@@ -124,37 +101,105 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 export default function DashboardPage() {
   const { data: students, loading: l1 } = useList<StudentEntity>('/students');
-  const { data: _teachers, loading: l2 } = useList<TeacherEntity>('/teachers');
-  const { data: _sessions, loading: l3 } = useList<SessionEntity>('/sessions');
+  const { data: teachers, loading: l2 } = useList<TeacherEntity>('/teachers');
+  const { data: sessions, loading: l3 } = useList<SessionEntity>('/sessions');
   const { data: attendance, loading: l4 } = useList<AttendanceEntity>('/attendance');
+  const { data: classes, loading: l5 } = useList<ClassEntity>('/classes');
+  const { data: subjects, loading: l6 } = useList<SubjectEntity>('/subjects');
+  const { data: rooms, loading: l7 } = useList<RoomEntity>('/rooms');
+  const { data: timetable, loading: l8 } = useList<TimetableEntity>('/timetable');
 
-  const loading = l1 || l2 || l3 || l4;
+  const loading = l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8;
 
-  // Calculate stats
+  // ── Computed stats ────────────────────────────────────────────
   const totalStudents = students.length;
+  const totalTeachers = teachers.length;
+  const totalClasses = classes.length;
+  const totalSubjects = subjects.length;
+  const totalRooms = rooms.length;
+  const totalSessions = sessions.length;
+  const activeSessions = sessions.filter(s => s.is_active).length;
+  const totalTimetableEntries = timetable.length;
+
   const enrolledStudents = students.filter(s => s.enrollment_status === 'Enrolled').length;
-  const _pendingEnrollments = students.filter(s => s.enrollment_status === 'Pending').length;
-  
-  const presentCount = attendance.filter(a => a.status === 'Present').length;
+  const pendingStudents = students.filter(s => s.enrollment_status === 'Pending').length;
+
   const totalAttendance = attendance.length;
-  const attendanceRate = totalAttendance > 0 ? ((presentCount / totalAttendance) * 100).toFixed(1) : '0';
-  
+  const presentCount = attendance.filter(a => a.status === 'Present').length;
+  const lateCount = attendance.filter(a => a.status === 'Late').length;
   const absentCount = attendance.filter(a => a.status === 'Absent').length;
-  const absenteeRate = totalAttendance > 0 ? ((absentCount / totalAttendance) * 100).toFixed(1) : '0';
 
-  // Mock low attendance students
-  const lowAttendanceStudents = [
-    { name: 'Alex Kim', course: 'CS-402 Systems', rate: 64, trend: 'down' },
-    { name: 'Jordan Lee', course: 'ENG-201 Design', rate: 68, trend: 'down' },
-    { name: 'Taylor Smith', course: 'BUS-301 Finance', rate: 71, trend: 'up' },
-  ];
+  const attendanceRate = totalAttendance > 0 ? ((presentCount / totalAttendance) * 100).toFixed(1) : '0';
+  const lateRate = totalAttendance > 0 ? ((lateCount / totalAttendance) * 100).toFixed(1) : '0';
+  const absentRate = totalAttendance > 0 ? ((absentCount / totalAttendance) * 100).toFixed(1) : '0';
 
-  // Mock faculty activity
-  const facultyActivity = [
-    { name: 'Prof. Sarah Jenkins', dept: 'Computer Science • Dept Head', status: 'LOGGED', time: '2 MINS AGO' },
-    { name: 'Dr. Michael Chen', dept: 'Engineering • Professor', status: 'IN SESSION', time: '15 MINS AGO' },
-    { name: 'Prof. Emily Davis', dept: 'Business • Associate', status: 'LOGGED', time: '1 HR AGO' },
-  ];
+  // ── Attendance by status for pie chart ────────────────────────
+  const attendanceByStatus = useMemo(() => {
+    if (totalAttendance === 0) return [];
+    return [
+      { name: 'Present', value: presentCount, color: '#22c55e' },
+      { name: 'Late', value: lateCount, color: '#eab308' },
+      { name: 'Absent', value: absentCount, color: '#ef4444' },
+    ].filter(d => d.value > 0);
+  }, [presentCount, lateCount, absentCount, totalAttendance]);
+
+  // ── Students per class for bar chart ──────────────────────────
+  const studentsPerClass = useMemo(() => {
+    const counts: Record<string, { name: string; count: number }> = {};
+    for (const cls of classes) {
+      counts[cls._id] = { name: cls.class_name, count: 0 };
+    }
+    for (const s of students) {
+      const classId = typeof s.class_id === 'string' ? s.class_id : s.class_id?._id;
+      if (classId && counts[classId]) {
+        counts[classId].count++;
+      }
+    }
+    return Object.values(counts).sort((a, b) => b.count - a.count);
+  }, [classes, students]);
+
+  // ── Enrollment distribution for pie chart ─────────────────────
+  const enrollmentDistribution = useMemo(() => {
+    if (totalStudents === 0) return [];
+    return [
+      { name: 'Enrolled', value: enrolledStudents, color: '#22c55e' },
+      { name: 'Pending', value: pendingStudents, color: '#eab308' },
+      { name: 'Failed', value: students.filter(s => s.enrollment_status === 'Failed').length, color: '#ef4444' },
+    ].filter(d => d.value > 0);
+  }, [students, enrolledStudents, pendingStudents, totalStudents]);
+
+  // ── Recent attendance records ─────────────────────────────────
+  const recentAttendance = useMemo(() => {
+    return [...attendance]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 5);
+  }, [attendance]);
+
+  // ── Recent sessions ───────────────────────────────────────────
+  const recentSessions = useMemo(() => {
+    return [...sessions]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+  }, [sessions]);
+
+  // ── Timetable by day ──────────────────────────────────────────
+  const timetableByDay = useMemo(() => {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days.map(day => ({
+      day: day.slice(0, 3),
+      count: timetable.filter(t => t.day_of_week === day).length,
+    }));
+  }, [timetable]);
+
+  /* ── Loading state ──────────────────────────────────────────── */
+  if (loading) {
+    return (
+      <div className="animate-fade-in flex flex-col items-center justify-center py-20 gap-4">
+        <RefreshCw className="w-6 h-6 animate-spin text-accent-500" />
+        <p className="text-sm text-[#737373]">Loading dashboard data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -162,257 +207,367 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           label="Total Students"
-          value={loading ? '...' : totalStudents.toLocaleString()}
-          trend="up"
-          trendValue="+11.01%"
+          value={totalStudents.toLocaleString()}
+          subtitle={`${enrolledStudents} enrolled · ${pendingStudents} pending`}
           icon={GraduationCap}
           iconBg="bg-[#1e3a5f] text-blue-400"
+          href="/students"
         />
         <KPICard
-          label="Faculty Attendance"
-          value={loading ? '...' : `${attendanceRate}%`}
-          trend="down"
-          trendValue="-0.03%"
+          label="Total Faculty"
+          value={totalTeachers.toLocaleString()}
           icon={Users}
           iconBg="bg-[#1e3a3a] text-emerald-400"
+          href="/teachers"
         />
         <KPICard
-          label="Absentee Rate"
-          value={loading ? '...' : `${absenteeRate}%`}
-          trend="up"
-          trendValue="+15.03%"
-          icon={AlertTriangle}
+          label="Attendance Rate"
+          value={`${attendanceRate}%`}
+          subtitle={`${presentCount} present of ${totalAttendance} records`}
+          icon={CheckSquare}
           iconBg="bg-[#3a2a1e] text-amber-400"
+          href="/attendance"
         />
         <KPICard
-          label="Enrollment Growth"
-          value={loading ? '...' : `${((enrolledStudents / (totalStudents || 1)) * 100).toFixed(1)}%`}
-          trend="up"
-          trendValue="+6.08%"
-          icon={BarChart3}
+          label="Active Sessions"
+          value={activeSessions}
+          subtitle={`${totalSessions} total sessions`}
+          icon={Clock}
           iconBg="bg-[#2a1e3a] text-purple-400"
+          href="/sessions"
+        />
+      </div>
+
+      {/* Secondary KPI Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <KPICard
+          label="Classes"
+          value={totalClasses}
+          icon={Layers}
+          iconBg="bg-[#1e2a3a] text-cyan-400"
+          href="/classes"
+        />
+        <KPICard
+          label="Subjects"
+          value={totalSubjects}
+          icon={BookOpen}
+          iconBg="bg-[#2a1e1e] text-rose-400"
+          href="/subjects"
+        />
+        <KPICard
+          label="Rooms"
+          value={totalRooms}
+          icon={DoorOpen}
+          iconBg="bg-[#1e3a2e] text-teal-400"
+          href="/rooms"
+        />
+        <KPICard
+          label="Timetable Entries"
+          value={totalTimetableEntries}
+          icon={Calendar}
+          iconBg="bg-[#3a3a1e] text-yellow-400"
+          href="/timetable"
         />
       </div>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Attendance Trends Chart - Takes 2 columns */}
+        {/* Students per Class — Bar Chart */}
         <div className="lg:col-span-2 card p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between mb-6 gap-4">
+          <div className="flex flex-col sm:flex-row items-start justify-between mb-6 gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-white">Attendance Trends</h2>
-              <p className="text-sm text-[#737373]">Academic performance and attendance metrics</p>
+              <h2 className="text-lg font-semibold text-white">Students per Class</h2>
+              <p className="text-sm text-[#737373]">Distribution of students across classes</p>
             </div>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-accent-500"></span>
-                <span className="text-[#a3a3a3]">CURRENT WEEK</span>
-                <span className="text-white font-semibold">$14,285</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-[#525252]"></span>
-                <span className="text-[#a3a3a3]">PREVIOUS WEEK</span>
-                <span className="text-white font-semibold">$12,940</span>
-              </div>
+            <Link href="/classes" className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
+              VIEW ALL
+            </Link>
+          </div>
+
+          {studentsPerClass.length === 0 ? (
+            <div className="flex flex-col items-center py-12 text-[#737373]">
+              <Layers className="w-8 h-8 mb-2 text-[#525252]" />
+              <p className="text-sm">No classes found. Create some classes first.</p>
             </div>
-          </div>
-          
-          <div className="h-[250px] sm:h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={attendanceTrends}>
-                <defs>
-                  <linearGradient id="colorCurrent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorPrevious" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#525252" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#525252" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#525252" 
-                  tick={{ fill: '#737373', fontSize: 12 }}
-                  axisLine={{ stroke: '#262626' }}
-                />
-                <YAxis 
-                  stroke="#525252" 
-                  tick={{ fill: '#737373', fontSize: 12 }}
-                  axisLine={{ stroke: '#262626' }}
-                  tickFormatter={(value) => `${value / 1000}k`}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="previous"
-                  stroke="#525252"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorPrevious)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="current"
-                  stroke="#f97316"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorCurrent)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          ) : (
+            <div className="h-[250px] sm:h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={studentsPerClass}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    stroke="#525252"
+                    tick={{ fill: '#737373', fontSize: 12 }}
+                    axisLine={{ stroke: '#262626' }}
+                  />
+                  <YAxis
+                    stroke="#525252"
+                    tick={{ fill: '#737373', fontSize: 12 }}
+                    axisLine={{ stroke: '#262626' }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         {/* Right Column */}
         <div className="space-y-6">
-          {/* Department Distribution */}
+          {/* Attendance Breakdown — Pie */}
           <div className="card p-6">
-            <h3 className="text-base font-semibold text-white mb-4">Department Distribution</h3>
-            <div className="relative h-[180px] flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={departmentData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={75}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {departmentData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="donut-center">
-                <p className="text-2xl font-bold text-white">38.6%</p>
-                <p className="text-[10px] text-accent-500 uppercase tracking-wider">Engineering</p>
+            <h3 className="text-base font-semibold text-white mb-4">Attendance Breakdown</h3>
+            {attendanceByStatus.length === 0 ? (
+              <div className="flex flex-col items-center py-8 text-[#737373]">
+                <CheckSquare className="w-8 h-8 mb-2 text-[#525252]" />
+                <p className="text-sm">No attendance records yet.</p>
               </div>
-            </div>
-            <div className="mt-4 space-y-2">
-              {departmentData.slice(0, 2).map((dept) => (
-                <div key={dept.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: dept.color }}></span>
-                    <span className="text-sm text-[#a3a3a3]">{dept.name}</span>
+            ) : (
+              <>
+                <div className="relative h-[180px] flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={attendanceByStatus}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={75}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {attendanceByStatus.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="donut-center">
+                    <p className="text-2xl font-bold text-white">{totalAttendance}</p>
+                    <p className="text-[10px] text-accent-500 uppercase tracking-wider">Records</p>
                   </div>
-                  <span className="text-sm font-medium text-white">{dept.value}%</span>
                 </div>
-              ))}
-            </div>
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span className="text-sm text-[#a3a3a3]">Present</span>
+                    </div>
+                    <span className="text-sm font-medium text-white">{presentCount} ({attendanceRate}%)</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                      <span className="text-sm text-[#a3a3a3]">Late</span>
+                    </div>
+                    <span className="text-sm font-medium text-white">{lateCount} ({lateRate}%)</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                      <span className="text-sm text-[#a3a3a3]">Absent</span>
+                    </div>
+                    <span className="text-sm font-medium text-white">{absentCount} ({absentRate}%)</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Attendance by Location */}
+          {/* Enrollment Status — Pie */}
           <div className="card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-white">Attendance by Location</h3>
-            </div>
-            <div className="space-y-4">
-              {locationData.map((loc) => (
-                <div key={loc.name} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-accent-500" />
-                    <span className="text-sm text-[#a3a3a3]">{loc.name}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-[#262626] rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-accent-500 rounded-full transition-all duration-500"
-                        style={{ width: `${loc.percentage}%` }}
-                      />
-                    </div>
-                    <span className="text-sm font-medium text-accent-500">{loc.percentage}%</span>
+            <h3 className="text-base font-semibold text-white mb-4">Enrollment Status</h3>
+            {enrollmentDistribution.length === 0 ? (
+              <div className="flex flex-col items-center py-8 text-[#737373]">
+                <GraduationCap className="w-8 h-8 mb-2 text-[#525252]" />
+                <p className="text-sm">No students yet.</p>
+              </div>
+            ) : (
+              <>
+                <div className="relative h-[150px] flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={enrollmentDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={65}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {enrollmentDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="donut-center">
+                    <p className="text-xl font-bold text-white">{totalStudents}</p>
+                    <p className="text-[10px] text-[#737373] uppercase tracking-wider">Total</p>
                   </div>
                 </div>
-              ))}
-            </div>
-            <div className="mt-4 pt-4 border-t border-[#262626] flex items-center justify-between">
-              <span className="text-xs text-[#525252]">LAST SYNC: 2M AGO</span>
-              <button className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
-                LIVE VIEW
-              </button>
-            </div>
+                <div className="mt-3 space-y-2">
+                  {enrollmentDistribution.map(d => (
+                    <div key={d.name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }}></span>
+                        <span className="text-sm text-[#a3a3a3]">{d.name}</span>
+                      </div>
+                      <span className="text-sm font-medium text-white">{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
 
       {/* Bottom Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Faculty Activity */}
+        {/* Timetable by Day — Bar */}
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-white">Faculty Activity</h3>
-            <Link href="/teachers" className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
+            <div>
+              <h3 className="text-base font-semibold text-white">Timetable by Day</h3>
+              <p className="text-sm text-[#737373]">Classes scheduled per day of the week</p>
+            </div>
+            <Link href="/timetable" className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
               VIEW ALL
             </Link>
           </div>
-          <div className="space-y-4">
-            {facultyActivity.map((faculty, idx) => (
-              <div key={idx} className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-[#262626] flex items-center justify-center text-[#737373] font-medium text-sm">
-                  {faculty.name.split(' ').map(n => n[0]).join('')}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{faculty.name}</p>
-                  <p className="text-xs text-[#525252]">{faculty.dept}</p>
-                </div>
-                <div className="text-right">
-                  <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                    faculty.status === 'LOGGED' 
-                      ? 'bg-emerald-500/10 text-emerald-400' 
-                      : 'bg-accent-500/10 text-accent-400'
-                  }`}>
-                    {faculty.status}
-                  </span>
-                  <p className="text-[10px] text-[#525252] mt-1">{faculty.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          {totalTimetableEntries === 0 ? (
+            <div className="flex flex-col items-center py-8 text-[#737373]">
+              <Calendar className="w-8 h-8 mb-2 text-[#525252]" />
+              <p className="text-sm">No timetable entries yet.</p>
+            </div>
+          ) : (
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={timetableByDay}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
+                  <XAxis
+                    dataKey="day"
+                    stroke="#525252"
+                    tick={{ fill: '#737373', fontSize: 12 }}
+                    axisLine={{ stroke: '#262626' }}
+                  />
+                  <YAxis
+                    stroke="#525252"
+                    tick={{ fill: '#737373', fontSize: 12 }}
+                    axisLine={{ stroke: '#262626' }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
-        {/* Critical Low Attendance */}
+        {/* Recent Sessions */}
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-white">Critical Low Attendance</h3>
-            <span className="text-xs font-semibold px-2 py-1 rounded bg-red-500/10 text-red-400">
-              ALERTS
-            </span>
+            <h3 className="text-base font-semibold text-white">Recent Sessions</h3>
+            <Link href="/sessions" className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
+              VIEW ALL
+            </Link>
+          </div>
+          {recentSessions.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-[#737373]">
+              <Clock className="w-8 h-8 mb-2 text-[#525252]" />
+              <p className="text-sm">No sessions yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentSessions.map((session) => {
+                const dateStr = new Date(session.date).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                });
+                return (
+                  <div key={session._id} className="flex items-center gap-4 p-3 rounded-lg bg-[#1a1a1a] hover:bg-[#222] transition-colors">
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${session.is_active ? 'bg-emerald-400' : 'bg-[#525252]'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{dateStr}</p>
+                      <p className="text-xs text-[#737373]">
+                        {session.is_active ? 'Active' : 'Inactive'}
+                        {session.start_time_actual && ` · Started ${new Date(session.start_time_actual).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Attendance Records */}
+      {recentAttendance.length > 0 && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold text-white">Recent Attendance</h3>
+            <Link href="/attendance" className="text-xs font-semibold text-accent-500 hover:text-accent-400 transition-colors">
+              VIEW ALL
+            </Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="text-left text-xs text-[#525252] uppercase tracking-wider">
-                  <th className="pb-3 font-medium">Student</th>
-                  <th className="pb-3 font-medium">Course</th>
-                  <th className="pb-3 font-medium">Rate</th>
-                  <th className="pb-3 font-medium">Trend</th>
+                  <th className="pb-3 font-medium">Time</th>
+                  <th className="pb-3 font-medium">Status</th>
+                  <th className="pb-3 font-medium">Method</th>
+                  <th className="pb-3 font-medium">Confidence</th>
+                  <th className="pb-3 font-medium">Location</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1f1f1f]">
-                {lowAttendanceStudents.map((student, idx) => (
-                  <tr key={idx} className="hover:bg-[#1a1a1a] transition-colors">
-                    <td className="py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#262626] flex items-center justify-center text-[#737373] text-xs font-medium">
-                          {student.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <span className="text-sm text-white">{student.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 text-sm text-[#737373]">{student.course}</td>
-                    <td className="py-3">
-                      <span className="text-sm font-semibold text-red-400">{student.rate}%</span>
+                {recentAttendance.map((record) => (
+                  <tr key={record._id} className="hover:bg-[#1a1a1a] transition-colors">
+                    <td className="py-3 text-sm text-white whitespace-nowrap">
+                      {new Date(record.timestamp).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </td>
                     <td className="py-3">
-                      {student.trend === 'down' ? (
-                        <TrendingDown className="w-4 h-4 text-red-400" />
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        record.status === 'Present'
+                          ? 'bg-emerald-500/10 text-emerald-400'
+                          : record.status === 'Late'
+                          ? 'bg-amber-500/10 text-amber-400'
+                          : 'bg-red-500/10 text-red-400'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          record.status === 'Present' ? 'bg-emerald-400'
+                          : record.status === 'Late' ? 'bg-amber-400'
+                          : 'bg-red-400'
+                        }`} />
+                        {record.status}
+                      </span>
+                    </td>
+                    <td className="py-3 text-sm text-[#a3a3a3]">
+                      {record.verification_method === 'Face' ? 'Face' : 'QR Fallback'}
+                    </td>
+                    <td className="py-3 text-sm text-[#a3a3a3]">
+                      {record.confidence_score != null
+                        ? `${(record.confidence_score * 100).toFixed(0)}%`
+                        : '—'}
+                    </td>
+                    <td className="py-3 text-sm">
+                      {record.location_verified ? (
+                        <span className="text-emerald-400">Verified</span>
                       ) : (
-                        <TrendingUp className="w-4 h-4 text-emerald-400" />
+                        <span className="text-[#737373]">—</span>
                       )}
                     </td>
                   </tr>
@@ -421,7 +576,7 @@ export default function DashboardPage() {
             </table>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
